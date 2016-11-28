@@ -69,14 +69,22 @@ class Irc:
 		pass
 
     def quitHandler(self, line):
-		pass
+        tokLine = line.split()
+        nickName = ((tokLine[0]).split("!")[0]).strip()[1:]
+        return nickName
 
     def partHandler(self, line):
-		pass
+        tokLine = line.split()
+        nickName = ((tokLine[0]).split("!")[0]).strip()[1:]
+        channel = tokLine[2]
+        return nickName, channel
 
     def joinHandler(self, line):
-		pass
-
+        tokLine = line.split()
+        nickName = ((tokLine[0]).split("!")[0]).strip()[1:]
+        channel = line.split(" :")[1]
+        return nickName, channel
+    
     def inviteHandler(self, line):
         return (line.split(" ")[3])[1:]
 
@@ -160,6 +168,21 @@ while 1:
 
         if msg.find("INVITE") > -1:
             irc.joinChannel(irc.inviteHandler(msg))
+
+        if msg.find("MODE") > -1:
+            irc.modeHandler(msg)
+
+        if msg.find("QUIT") > -1:
+            nick = irc.quitHandler(msg)
+            print nick + " has quit"
+
+        if msg.find("PART") > -1:
+            nick, chan = irc.partHandler(msg)
+            print nick + " has left " + chan
+
+        if msg.find("JOIN") > -1:
+            nick, chan = irc.joinHandler(msg)
+            print nick + " has join " + chan
 
         if (number == 6) and not auth:
             auth = 1
