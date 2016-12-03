@@ -21,6 +21,7 @@
 import sys
 import socket
 import string
+import ssl
 
 HOST = "ayy.lmao"
 NICK = "nickName"
@@ -31,8 +32,10 @@ REALNAME = "realname"
 class Server:
     #private sock
     #private stringBuffer
-    def __init__(self, server, port=6667):
+    def __init__(self, server, port=6667, sslU=False):
         self.sock = socket.socket( )
+        if sslU:
+            self.sock = ssl.wrap_socket(self.sock)
         self.sock.connect((server, port))
         self.stringBuffer = ""
         
@@ -50,8 +53,8 @@ class Server:
 
 class Irc:
     #private ServerObj
-    def __init__(self, server, port=6667):
-        self.ServerObj = Server(server, port);
+    def __init__(self, server, port=6667, sslU=False):
+        self.ServerObj = Server(server, port, sslU);
         self.lastString = ""
         self.messages = []
     
@@ -64,12 +67,6 @@ class Irc:
         channel = (tokLine[2]).strip()
         message = line.split(" :")[1]
         return nickName, channel, message
-
-    def sendMessage(self, channel, message):
-        self.ServerObj.write("PRIVMSG " + channel + " :" + message +"\r\n")
-
-    def sendNotice(self, channel, message):
-        self.ServerObj.write("NOTICE " + channel + " :" + message +"\r\n")
 
     def modeHandler(self, line):
         pass
@@ -93,9 +90,15 @@ class Irc:
 
     def inviteHandler(self, line):
         return (line.split(" ")[3])[1:]
+    
+    def sendMessage(self, channel, message):
+        self.ServerObj.write("PRIVMSG " + channel + " :" + message +"\r\n")
 
-    def setMode(self, channel, moded, mode):
-        self.ServerObj.write("MODE " + channel + " " + mode + " " + moded + "\r\n")
+    def sendNotice(self, channel, message):
+        self.ServerObj.write("NOTICE " + channel + " :" + message +"\r\n")
+
+    def setMode(self, channel, moded, mode, message=""):
+        self.ServerObj.write("MODE " + channel + " " + mode + " " + moded + message +"\r\n")
 
     def readline(self):
         return self.ServerObj.read()
@@ -111,11 +114,17 @@ class Irc:
         self.ServerObj.write("KICK " + channel + " " + kicked + " :" + message + "\r\n")
 
     def ban(self, channel, banned, message=""):
-        self.setMode(channel, "+b", banned)
+        self.setMode(channel, "+b", banned, " :" + message)
 
     def kickAndBan(self, channel, banned, message=""):
         self.kick(channel, banned, message)
         self.ban(channel, banned, message)
+
+    def quit(self, message=""):
+        self.ServerObj.write("QUIT" + " :" + message + "\r\n")
+
+    def nickChange(self, newNick):
+        self.ServerObj.write("NICK" + " " + newNick + "\r\n")
 
 ##CONTROLLER
 
@@ -125,10 +134,9 @@ irc.connect()
 auth = 0
 number = 0
 channels = ["#chan", "#chan2"] #list of channels to join
-#TODO add multiple channel permissions
 instructionsOP = {".op" : "+o", ".deop" : "-o", ".protect" : "+a", ".deprotect" : "-a", ".voice" : "+v", ".devoice" : "-v", ".hop" : "+h", ".dehop" : "-h"} #possible commands form chat line (command : mode)
-instructionsPR = {".k" : irc.kick, ".kb" : irc.kickAndBan, ".b" : irc.ban}
-authorized = {"#chan" : {"authNickName" : [".op", ".deop", ".hop", ".dehop", ".voice",".devoice", ".k"]}} #authorized users + list of commands they can use
+instructionsPR = {".k" : irc.kick, ".kb" : irc.kickAndBan, ".b" : irc.ban, ".quit" : irc.quit, ".nick" : irc.nickChange}
+authorized = {"#chan" : {"authNickName" : [".op", ".deop", ".hop", ".dehop", ".voice",".devoice", ".k"]}}} #authorized users + list of commands they can use
 while 1:
     msgList = irc.readline()
     for msg in msgList:
@@ -155,8 +163,10 @@ while 1:
                 if nick in authorized[chan.strip()]:
                     for command in (authorized[chan.strip()])[nick.strip()]:
                         if mess[0].strip() == command:
-                            if len(mess) > 1:
+                            if len(mess) == 1:
                                 instructionsPR[mess[0]](chan, mess[1])
+                            elif len(mess) > 1:
+                                instructionsPR[mess[0]]("".join(str(x) for x in mess))
 
         if msg.find("NOTICE") > -1:
             nick, chan, mess = irc.messageHandler(msg)
