@@ -80,13 +80,20 @@ class Irc:
         tokLine = line.split()
         nickName = ((tokLine[0]).split("!")[0]).strip()[1:]
         channel = tokLine[2]
+        if channel.startswith(":"):
+            channel = channel[1:]
         return nickName, channel
 
     def joinHandler(self, line):
         tokLine = line.split()
         nickName = ((tokLine[0]).split("!")[0]).strip()[1:]
-        channel = line.split(" :")[1]
+        channel = tokLine[2]
+        if channel.startswith(":"):
+            channel = channel[1:]
         return nickName, channel
+
+    def kickHandler(self, line):
+        pass
 
     def inviteHandler(self, line):
         return (line.split(" ")[3])[1:]
@@ -136,7 +143,7 @@ number = 0
 channels = ["#chan", "#chan2"] #list of channels to join
 instructionsOP = {".op" : "+o", ".deop" : "-o", ".protect" : "+a", ".deprotect" : "-a", ".voice" : "+v", ".devoice" : "-v", ".hop" : "+h", ".dehop" : "-h"} #possible commands form chat line (command : mode)
 instructionsPR = {".k" : irc.kick, ".kb" : irc.kickAndBan, ".b" : irc.ban, ".quit" : irc.quit, ".nick" : irc.nickChange}
-authorized = {"#chan" : {"authNickName" : [".op", ".deop", ".hop", ".dehop", ".voice",".devoice", ".k"]}}} #authorized users + list of commands they can use
+authorized = {"#chan" : {"authNickName" : [".op", ".deop", ".hop", ".dehop", ".voice",".devoice", ".k"]}} #authorized users + list of commands they can use
 while 1:
     msgList = irc.readline()
     for msg in msgList:
@@ -163,9 +170,9 @@ while 1:
                 if nick in authorized[chan.strip()]:
                     for command in (authorized[chan.strip()])[nick.strip()]:
                         if mess[0].strip() == command:
-                            if len(mess) == 1:
+                            if len(mess) == 2:
                                 instructionsPR[mess[0]](chan, mess[1])
-                            elif len(mess) > 1:
+                            elif len(mess) > 2:
                                 instructionsPR[mess[0]]("".join(str(x) for x in mess))
 
         if msg.find("NOTICE") > -1:
